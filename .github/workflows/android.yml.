@@ -1,0 +1,49 @@
+
+name: Build NFT BATTLE APK
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - 'NFT_BATTLE_BIG_UPDATE_WORKING_V28_ORIGINAL_BG_FRAMES.zip'
+      - '.github/workflows/android.yml'
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Extract project ZIP
+        run: |
+          unzip -o NFT_BATTLE_BIG_UPDATE_WORKING_V28_ORIGINAL_BG_FRAMES.zip -d project
+          find project -maxdepth 4 -type f | head -80
+
+      - name: Locate Gradle project
+        run: |
+          FILE=$(find project -name gradlew -type f | head -1)
+          if [ -z "$FILE" ]; then
+            echo "ERROR: No gradlew file found in ZIP"
+            exit 1
+          fi
+          echo "GRADLEW=$FILE" >> "$GITHUB_ENV"
+          chmod +x "$FILE"
+
+      - name: Build APK
+        run: |
+          cd "$(dirname "$GRADLEW")"
+          ./gradlew assembleDebug
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: NFT-BATTLE-APK
+          path: project/**/build/outputs/apk/**/*.apk
