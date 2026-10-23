@@ -5,12 +5,6 @@ on:
   workflow_dispatch:
   push:
     paths:
-name: Build NFT BATTLE APK
-
-on:
-  workflow_dispatch:
-  push:
-    paths:
       - "NFT_BATTLE_V28_FIREBASE_INIT_FIX.zip"
       - ".github/workflows/build-apk.yml"
 
@@ -49,17 +43,14 @@ jobs:
           set -euo pipefail
           ARCHIVE="NFT_BATTLE_V28_FIREBASE_INIT_FIX.zip"
 
-          if [[ ! -f "$ARCHIVE" ]]; then
-            echo "ERROR: ZIP not found in repository root: $ARCHIVE"
+          test -f "$ARCHIVE" || {
+            echo "ERROR: ZIP not found in repository root"
             ls -la
             exit 1
-          fi
+          }
 
           mkdir -p "$RUNNER_TEMP/nft-battle-source"
           unzip -oq "$ARCHIVE" -d "$RUNNER_TEMP/nft-battle-source"
-
-          echo "Extracted files:"
-          find "$RUNNER_TEMP/nft-battle-source" -maxdepth 4 -type f | head -100
 
       - name: Locate Android project
         shell: bash
@@ -80,8 +71,7 @@ jobs:
           )
 
           if [[ -z "$PROJECT" ]]; then
-            echo "ERROR: Android Gradle project not found."
-            echo "Expected settings.gradle and app/build.gradle in the same project."
+            echo "ERROR: Android Gradle project not found"
             find "$BASE" -type f \
               \( -name settings.gradle -o -name settings.gradle.kts \
                  -o -name build.gradle -o -name build.gradle.kts \)
@@ -89,7 +79,7 @@ jobs:
           fi
 
           echo "PROJECT_DIR=$PROJECT" >> "$GITHUB_ENV"
-          echo "Android project: $PROJECT"
+          echo "Found project: $PROJECT"
 
       - name: Build debug APK
         shell: bash
@@ -97,7 +87,7 @@ jobs:
           set -euo pipefail
           gradle -p "$PROJECT_DIR" assembleDebug --no-daemon --stacktrace
 
-      - name: Find and verify APK
+      - name: Verify and prepare APK
         shell: bash
         run: |
           set -euo pipefail
@@ -105,8 +95,7 @@ jobs:
             -path '*/build/outputs/apk/debug/*.apk' -print -quit)"
 
           if [[ -z "$APK" || ! -s "$APK" ]]; then
-            echo "ERROR: Debug APK was not created."
-            find "$PROJECT_DIR" -path '*/build/outputs/apk/*' -type f -print || true
+            echo "ERROR: APK was not created"
             exit 1
           fi
 
@@ -121,3 +110,4 @@ jobs:
           path: ${{ runner.temp }}/nft-battle-apk/NFT-BATTLE-debug.apk
           if-no-files-found: error
           retention-days: 7
+
