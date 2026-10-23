@@ -5,6 +5,12 @@ on:
   workflow_dispatch:
   push:
     paths:
+name: Build NFT BATTLE APK
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
       - "NFT_BATTLE_V28_FIREBASE_INIT_FIX.zip"
       - ".github/workflows/build-apk.yml"
 
@@ -44,7 +50,7 @@ jobs:
           ARCHIVE="NFT_BATTLE_V28_FIREBASE_INIT_FIX.zip"
 
           if [[ ! -f "$ARCHIVE" ]]; then
-            echo "ERROR: V28 ZIP not found in repository root."
+            echo "ERROR: ZIP not found in repository root: $ARCHIVE"
             ls -la
             exit 1
           fi
@@ -52,7 +58,7 @@ jobs:
           mkdir -p "$RUNNER_TEMP/nft-battle-source"
           unzip -oq "$ARCHIVE" -d "$RUNNER_TEMP/nft-battle-source"
 
-          echo "Files extracted:"
+          echo "Extracted files:"
           find "$RUNNER_TEMP/nft-battle-source" -maxdepth 4 -type f | head -100
 
       - name: Locate Android project
@@ -74,8 +80,8 @@ jobs:
           )
 
           if [[ -z "$PROJECT" ]]; then
-            echo "ERROR: Could not find settings.gradle and app/build.gradle together."
-            echo "Checking extracted Gradle files:"
+            echo "ERROR: Android Gradle project not found."
+            echo "Expected settings.gradle and app/build.gradle in the same project."
             find "$BASE" -type f \
               \( -name settings.gradle -o -name settings.gradle.kts \
                  -o -name build.gradle -o -name build.gradle.kts \)
@@ -83,7 +89,7 @@ jobs:
           fi
 
           echo "PROJECT_DIR=$PROJECT" >> "$GITHUB_ENV"
-          echo "Selected Android project: $PROJECT"
+          echo "Android project: $PROJECT"
 
       - name: Build debug APK
         shell: bash
