@@ -13,7 +13,9 @@ permissions:
 
 jobs:
   build:
+    name: Build Android APK
     runs-on: ubuntu-latest
+    timeout-minutes: 30
 
     steps:
       - name: Checkout repository
@@ -25,35 +27,65 @@ jobs:
           distribution: temurin
           java-version: '17'
 
-      - name: Install Gradle 8.9
-        run: |
-          curl -fL https://services.gradle.org/distributions/gradle-8.9-bin.zip -o /tmp/gradle.zip
-          unzip -q /tmp/gradle.zip -d /tmp
-          echo "/tmp/gradle-8.9/bin" >> "$GITHUB_PATH"
+      - name: Set up Gradle 8.9
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.9'
 
-      - name: Extract project ZIP
+      - name: Extract and validate Android project
+        shell: bash
         run: |
-          unzip -o NFT_BATTLE_BIG_UPDATE_WORKING_V28_ORIGINAL_BG_FRAMES.zip -d project
-          find project -type f \( -name settings.gradle -o -name settings.gradle.kts \)
-
-      - name: Locate Android project
-        run: |
-          FILE=$(find project -type f \( -name settings.gradle -o -name settings.gradle.kts \) | head -1)
-          if [ -z "$FILE" ]; then
-            echo "ERROR: No settings.gradle found in ZIP"
+          set -euo pipefail
+          ARCHIVE='NFT_BATTLE_BIG_UPDATE_WORKING_V28_ORIGINAL_BG_FRAMES.zip'
+          if [[ ! -f "$ARCHIVE" ]]; then
+            echo "ERROR: Archive not found in repository root: $ARCHIVE"
+            ls -la
             exit 1
           fi
-          ROOT="${FILE%/*}"
-          echo "PROJECT_ROOT=$ROOT" >> "$GITHUB_ENV"
-          echo "Android project: $ROOT"
+          mkdir -p "$RUNNER_TEMP/nft-battle-source"
+          unzip -oq "$ARCHIVE" -d "$RUNNER_TEMP/nft-battle-source"
+          SETTINGS_FILE="$(find "$RUNNER_TEMP/nft-battle-source" -type f \( -name settings.gradle -o -name settings.gradle.kts \) -print -quit)"
+          if [[ -z "$SETTINGS_FILE" ]]; then
+            echo 'ERROR: settings.gradle/settings.gradle.kts not found inside ZIP.'
+            find "$RUNNER_TEMP/nft-battle-source" -maxdepth 5 -type f -print
+            exit 1
+          fi
+          PROJECT_DIR="$(dirname "$SETTINGS_FILE")"
+          if [[ ! -f "$PROJECT_DIR/build.gradle" && ! -f "$PROJECT_DIR/build.gradle.kts" ]]; then
+            echo "ERROR: Root Gradle build file missing in $PROJECT_DIR"
+            exit 1
+          fi
+          if [[ ! -f "$PROJECT_DIR/app/build.gradle" && ! -f "$PROJECT_DIR/app/build.gradle.kts" ]]; then
+            echo "ERROR: app/build.gradle or app/build.gradle.kts missing in $PROJECT_DIR"
+            exit 1
+          fi
+          echo "PROJECT_DIR=$PROJECT_DIR" >> "$GITHUB_ENV"
+          echo "Android project found: $PROJECT_DIR"
+          echo 'Project root files:'
+          ls -la "$PROJECT_DIR"
 
       - name: Build debug APK
+        shell: bash
         run: |
-          gradle -p "$PROJECT_ROOT" assembleDebug --no-daemon
+          set -euo pipefail
+          gradle -p "$PROJECT_DIR" assembleDebug --no-daemon --stacktrace
 
-      - name: Upload APK
+      - name: Verify APK exists
+        shell: bash
+        run: |
+          set -euo pipefail
+          APK="$PROJECT_DIR/app/build/outputs/apk/debug/app-debug.apk"
+          if [[ ! -s "$APK" ]]; then
+            echo 'ERROR: Expected APK was not created.'
+            find "$PROJECT_DIR" -path '*/build/outputs/apk/*' -type f -print || true
+            exit 1
+          fi
+          ls -lh "$APK"
+
+      - name: Upload APK artifact
         uses: actions/upload-artifact@v4
         with:
           name: NFT-BATTLE-APK
-          path: project/**/build/outputs/apk/debug/*.apk
+          path: ${{ env.PROJECT_DIR }}/app/build/outputs/apk/debug/app-debug.apk
           if-no-files-found: error
+          retention-days: 14
