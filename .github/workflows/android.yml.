@@ -8,6 +8,9 @@ on:
       - 'NFT_BATTLE_BIG_UPDATE_WORKING_V28_ORIGINAL_BG_FRAMES.zip'
       - '.github/workflows/android.yml'
 
+permissions:
+  contents: read
+
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -16,34 +19,41 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Set up Java
+      - name: Set up Java 17
         uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: '17'
 
+      - name: Install Gradle 8.9
+        run: |
+          curl -fL https://services.gradle.org/distributions/gradle-8.9-bin.zip -o /tmp/gradle.zip
+          unzip -q /tmp/gradle.zip -d /tmp
+          echo "/tmp/gradle-8.9/bin" >> "$GITHUB_PATH"
+
       - name: Extract project ZIP
         run: |
           unzip -o NFT_BATTLE_BIG_UPDATE_WORKING_V28_ORIGINAL_BG_FRAMES.zip -d project
-          find project -maxdepth 4 -type f | head -80
+          find project -type f \( -name settings.gradle -o -name settings.gradle.kts \)
 
-      - name: Locate Gradle project
+      - name: Locate Android project
         run: |
-          FILE=$(find project -name gradlew -type f | head -1)
+          FILE=$(find project -type f \( -name settings.gradle -o -name settings.gradle.kts \) | head -1)
           if [ -z "$FILE" ]; then
-            echo "ERROR: No gradlew file found in ZIP"
+            echo "ERROR: No settings.gradle found in ZIP"
             exit 1
           fi
-          echo "GRADLEW=$FILE" >> "$GITHUB_ENV"
-          chmod +x "$FILE"
+          ROOT="${FILE%/*}"
+          echo "PROJECT_ROOT=$ROOT" >> "$GITHUB_ENV"
+          echo "Android project: $ROOT"
 
-      - name: Build APK
+      - name: Build debug APK
         run: |
-          cd "$(dirname "$GRADLEW")"
-          ./gradlew assembleDebug
+          gradle -p "$PROJECT_ROOT" assembleDebug --no-daemon
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
           name: NFT-BATTLE-APK
-          path: project/**/build/outputs/apk/**/*.apk
+          path: project/**/build/outputs/apk/debug/*.apk
+          if-no-files-found: error
