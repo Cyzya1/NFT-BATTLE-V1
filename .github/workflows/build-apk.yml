@@ -1,0 +1,117 @@
+
+name: Build NFT BATTLE APK
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - "NFT_BATTLE_BIG_UPDATE_WORKING_V28_ORIGINAL_BG_FRAMES.zip"
+      - ".github/workflows/build-apk.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Build Android APK
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Install Gradle
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl -fL --retry 3 \
+            https://services.gradle.org/distributions/gradle-8.9-bin.zip \
+            -o "$RUNNER_TEMP/gradle.zip"
+          unzip -q "$RUNNER_TEMP/gradle.zip" -d "$RUNNER_TEMP"
+          echo "$RUNNER_TEMP/gradle-8.9/bin" >> "$GITHUB_PATH"
+
+      - name: Extract V28 project
+        shell: bash
+        run: |
+          set -euo pipefail
+          ARCHIVE="NFT_BATTLE_BIG_UPDATE_WORKING_V28_ORIGINAL_BG_FRAMES.zip"
+
+          if [[ ! -f "$ARCHIVE" ]]; then
+            echo "ERROR: V28 ZIP not found in repository root."
+            ls -la
+            exit 1
+          fi
+
+          mkdir -p "$RUNNER_TEMP/nft-battle-source"
+          unzip -oq "$ARCHIVE" -d "$RUNNER_TEMP/nft-battle-source"
+
+          echo "Files extracted:"
+          find "$RUNNER_TEMP/nft-battle-source" -maxdepth 4 -type f | head -100
+
+      - name: Locate Android project
+        shell: bash
+        run: |
+          set -euo pipefail
+          BASE="$RUNNER_TEMP/nft-battle-source"
+          PROJECT=""
+
+          while IFS= read -r SETTINGS; do
+            DIR="$(dirname "$SETTINGS")"
+            if [[ -f "$DIR/app/build.gradle" || -f "$DIR/app/build.gradle.kts" ]]; then
+              PROJECT="$DIR"
+              break
+            fi
+          done < <(
+            find "$BASE" -type f \
+              \( -name settings.gradle -o -name settings.gradle.kts \)
+          )
+
+          if [[ -z "$PROJECT" ]]; then
+            echo "ERROR: Could not find settings.gradle and app/build.gradle together."
+            echo "Checking extracted Gradle files:"
+            find "$BASE" -type f \
+              \( -name settings.gradle -o -name settings.gradle.kts \
+                 -o -name build.gradle -o -name build.gradle.kts \)
+            exit 1
+          fi
+
+          echo "PROJECT_DIR=$PROJECT" >> "$GITHUB_ENV"
+          echo "Selected Android project: $PROJECT"
+
+      - name: Build debug APK
+        shell: bash
+        run: |
+          set -euo pipefail
+          gradle -p "$PROJECT_DIR" assembleDebug --no-daemon --stacktrace
+
+      - name: Find and verify APK
+        shell: bash
+        run: |
+          set -euo pipefail
+          APK="$(find "$PROJECT_DIR" -type f \
+            -path '*/build/outputs/apk/debug/*.apk' -print -quit)"
+
+          if [[ -z "$APK" || ! -s "$APK" ]]; then
+            echo "ERROR: Debug APK was not created."
+            find "$PROJECT_DIR" -path '*/build/outputs/apk/*' -type f -print || true
+            exit 1
+          fi
+
+          mkdir -p "$RUNNER_TEMP/nft-battle-apk"
+          cp "$APK" "$RUNNER_TEMP/nft-battle-apk/NFT-BATTLE-debug.apk"
+          ls -lh "$RUNNER_TEMP/nft-battle-apk/NFT-BATTLE-debug.apk"
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: NFT-BATTLE-APK
+          path: ${{ runner.temp }}/nft-battle-apk/NFT-BATTLE-debug.apk
+          if-no-files-found: error
+          retention-days: 7
