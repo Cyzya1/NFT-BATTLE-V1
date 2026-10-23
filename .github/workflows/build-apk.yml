@@ -5,7 +5,7 @@ on:
   workflow_dispatch:
   push:
     paths:
-      - "NFT_BATTLE_BIG_UPDATE_WORKING_V28_ORIGINAL_BG_FRAMES.zip"
+      - "NFT_BATTLE_V28_FIREBASE_INIT_FIX.zip"
       - ".github/workflows/build-apk.yml"
 
 permissions:
@@ -41,7 +41,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          ARCHIVE="NFT_BATTLE_BIG_UPDATE_WORKING_V28_ORIGINAL_BG_FRAMES.zip"
+          ARCHIVE="NFT_BATTLE_V28_FIREBASE_INIT_FIX.zip"
 
           if [[ ! -f "$ARCHIVE" ]]; then
             echo "ERROR: V28 ZIP not found in repository root."
