@@ -1,11 +1,10 @@
-
 name: Build NFT BATTLE APK
 
 on:
   workflow_dispatch:
   push:
     paths:
-      - "NFT_BATTLE_V28_FIREBASE_INIT_FIX.zip"
+      - "NFT_BATTLE_BIG_UPDATE_WIP_V29.zip"
       - ".github/workflows/build-apk.yml"
 
 permissions:
@@ -37,14 +36,14 @@ jobs:
           unzip -q "$RUNNER_TEMP/gradle.zip" -d "$RUNNER_TEMP"
           echo "$RUNNER_TEMP/gradle-8.9/bin" >> "$GITHUB_PATH"
 
-      - name: Extract V28 project
+      - name: Extract V29 project
         shell: bash
         run: |
           set -euo pipefail
-          ARCHIVE="NFT_BATTLE_V28_FIREBASE_INIT_FIX.zip"
+          ARCHIVE="NFT_BATTLE_BIG_UPDATE_WIP_V29.zip"
 
           test -f "$ARCHIVE" || {
-            echo "ERROR: ZIP not found in repository root"
+            echo "ERROR: ZIP not found in repository root: $ARCHIVE"
             ls -la
             exit 1
           }
@@ -71,7 +70,7 @@ jobs:
           )
 
           if [[ -z "$PROJECT" ]]; then
-            echo "ERROR: Android Gradle project not found"
+            echo "ERROR: Android Gradle project not found in V29 ZIP"
             find "$BASE" -type f \
               \( -name settings.gradle -o -name settings.gradle.kts \
                  -o -name build.gradle -o -name build.gradle.kts \)
@@ -110,4 +109,3 @@ jobs:
           path: ${{ runner.temp }}/nft-battle-apk/NFT-BATTLE-debug.apk
           if-no-files-found: error
           retention-days: 7
-
